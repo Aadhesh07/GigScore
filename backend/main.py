@@ -1,9 +1,10 @@
 """
 GigScore - FastAPI Backend
 
-This API exposes:
-1. Worker identity/profile retrieval
-2. GigScore prediction
+Provides:
+1. Worker search
+2. Worker profile retrieval
+3. GigScore prediction
 
 Run from the GigScore project root:
 
@@ -11,11 +12,10 @@ Run from the GigScore project root:
 """
 
 import csv
-import random
 from pathlib import Path
 from typing import List
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -23,17 +23,30 @@ from ml.predict import predict_worker
 
 
 # ============================================================
-# Paths
+# PATHS
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-WORKERS_PATH = BASE_DIR / "data" / "workers_backup.csv"
+# ------------------------------------------------------------
+# PRIMARY DATASET
+#
+# The current GigScore generator uses:
+#
+# income_month_1 ... income_month_12
+# jobs_month_1   ... jobs_month_12
+#
+# Keep workers_backup.csv only as a fallback.
+# ------------------------------------------------------------
+
+PRIMARY_WORKERS_PATH = BASE_DIR / "data" / "workers.csv"
+BACKUP_WORKERS_PATH = BASE_DIR / "data" / "workers_backup.csv"
+
 IDENTITY_PATH = BASE_DIR / "data" / "worker_identity.csv"
 
 
 # ============================================================
-# Application
+# APPLICATION
 # ============================================================
 
 app = FastAPI(
@@ -43,7 +56,7 @@ app = FastAPI(
         "supplementary behavioural signal for gig-worker "
         "credit assessment."
     ),
-    version="0.2.0",
+    version="0.4.0",
 )
 
 
@@ -61,13 +74,10 @@ app.add_middleware(
 
 
 # ============================================================
-# Request model
+# REQUEST MODEL
 # ============================================================
 
 class WorkerProfile(BaseModel):
-    """
-    Raw worker information submitted to GigScore.
-    """
 
     worker_id: str = Field(
         min_length=1,
@@ -80,31 +90,31 @@ class WorkerProfile(BaseModel):
     )
 
     tenure_months: int = Field(
-        ge=12,
-        le=60,
+        ge=0,
+        le=120,
         description="Months active on the platform",
     )
 
     avg_rating: float = Field(
-        ge=3.5,
+        ge=0.0,
         le=5.0,
         description="Average platform rating",
     )
 
     completion_rate: float = Field(
-        ge=0.50,
+        ge=0.0,
         le=1.0,
         description="Completed jobs divided by accepted jobs",
     )
 
     cancellation_rate: float = Field(
         ge=0.0,
-        le=0.35,
+        le=1.0,
         description="Cancelled jobs divided by accepted jobs",
     )
 
     jobs_completed: int = Field(
-        ge=50,
+        ge=0,
         description="Lifetime completed jobs",
     )
 
@@ -122,7 +132,7 @@ class WorkerProfile(BaseModel):
 
 
 # ============================================================
-# Helper: load worker identities
+# LOAD IDENTITIES
 # ============================================================
 
 def load_identities():
@@ -146,29 +156,57 @@ def load_identities():
         reader = csv.DictReader(file)
 
         for row in reader:
-            identities[row["worker_id"]] = {
-                "name": row["name"],
-                "phone": row["phone"],
+
+            worker_id = row.get("worker_id", "").strip()
+
+            if not worker_id:
+                continue
+
+            identities[worker_id] = {
+                "name": row.get("name", "").strip(),
+                "phone": row.get("phone", "").strip(),
             }
 
     return identities
 
 
 # ============================================================
-# Helper: load workers
+# FIND WORKER DATASET
+# ============================================================
+
+def get_workers_path():
+    """
+    Use the current workers.csv dataset if available.
+
+    Fall back to workers_backup.csv only if workers.csv
+    does not exist.
+    """
+
+    if PRIMARY_WORKERS_PATH.exists():
+        return PRIMARY_WORKERS_PATH
+
+    if BACKUP_WORKERS_PATH.exists():
+        return BACKUP_WORKERS_PATH
+
+    raise FileNotFoundError(
+        "No worker dataset found. Expected either:\n"
+        f"{PRIMARY_WORKERS_PATH}\n"
+        f"{BACKUP_WORKERS_PATH}"
+    )
+
+
+# ============================================================
+# LOAD WORKERS
 # ============================================================
 
 def load_workers():
     """
-    Load worker behavioural profiles from the backup dataset.
+    Load behavioural worker profiles.
     """
 
-    if not WORKERS_PATH.exists():
-        raise FileNotFoundError(
-            f"Worker dataset not found: {WORKERS_PATH}"
-        )
+    workers_path = get_workers_path()
 
-    with WORKERS_PATH.open(
+    with workers_path.open(
         "r",
         newline="",
         encoding="utf-8",
@@ -176,39 +214,147 @@ def load_workers():
 
         reader = csv.DictReader(file)
 
-        return list(reader)
+        rows = list(reader)
+
+    return rows
 
 
 # ============================================================
-# Helper: convert CSV worker to API format
+# MONTHLY VALUE HELPERS
+# ============================================================
+
+def get_monthly_income(row, month):
+    """
+    Read monthly income.
+
+    Current dataset:
+        income_month_1 ... income_month_12
+
+    Legacy dataset:
+        income_m1 ... income_m12
+    """
+
+    current_key = f"income_month_{month}"
+    legacy_key = f"income_m{month}"
+
+    value = row.get(current_key)
+
+    if value is None or value == "":
+        value = row.get(legacy_key)
+
+    if value is None or value == "":
+        return 0.0
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def get_monthly_jobs(row, month):
+    """
+    Read monthly completed jobs.
+
+    Current dataset:
+        jobs_month_1 ... jobs_month_12
+
+    Legacy dataset:
+        jobs_m1 ... jobs_m12
+    """
+
+    current_key = f"jobs_month_{month}"
+    legacy_key = f"jobs_m{month}"
+
+    value = row.get(current_key)
+
+    if value is None or value == "":
+        value = row.get(legacy_key)
+
+    if value is None or value == "":
+        return 0
+
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+# ============================================================
+# SAFE INTEGER
+# ============================================================
+
+def safe_int(value, default=0):
+
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+# ============================================================
+# SAFE FLOAT
+# ============================================================
+
+def safe_float(value, default=0.0):
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+# ============================================================
+# CONVERT CSV WORKER
 # ============================================================
 
 def convert_worker(row):
-    """
-    Convert CSV values into the format expected by /score.
-    """
+
+    monthly_income = [
+        get_monthly_income(row, month)
+        for month in range(1, 13)
+    ]
+
+    monthly_jobs = [
+        get_monthly_jobs(row, month)
+        for month in range(1, 13)
+    ]
 
     return {
-        "worker_id": row["worker_id"],
-        "platform": row["platform"],
-        "tenure_months": int(row["tenure_months"]),
-        "avg_rating": float(row["avg_rating"]),
-        "completion_rate": float(row["completion_rate"]),
-        "cancellation_rate": float(row["cancellation_rate"]),
-        "jobs_completed": int(row["jobs_completed"]),
-        "monthly_income": [
-            float(row[f"income_m{i}"])
-            for i in range(1, 13)
-        ],
-        "monthly_jobs": [
-            int(row[f"jobs_m{i}"])
-            for i in range(1, 13)
-        ],
+        "worker_id": row.get("worker_id", "").strip(),
+
+        "platform": row.get(
+            "platform",
+            "Unknown",
+        ).strip(),
+
+        "tenure_months": safe_int(
+            row.get("tenure_months")
+        ),
+
+        "avg_rating": safe_float(
+            row.get("avg_rating")
+        ),
+
+        "completion_rate": safe_float(
+            row.get("completion_rate")
+        ),
+
+        "cancellation_rate": safe_float(
+            row.get("cancellation_rate")
+        ),
+
+        "jobs_completed": safe_int(
+            row.get("jobs_completed")
+        ),
+
+        "monthly_income": monthly_income,
+
+        "monthly_jobs": monthly_jobs,
     }
 
 
 # ============================================================
-# Root endpoint
+# ROOT
 # ============================================================
 
 @app.get("/")
@@ -216,13 +362,13 @@ def root():
 
     return {
         "name": "GigScore API",
-        "version": "0.2.0",
+        "version": "0.4.0",
         "status": "running",
     }
 
 
 # ============================================================
-# Health endpoint
+# HEALTH
 # ============================================================
 
 @app.get("/health")
@@ -235,50 +381,127 @@ def health():
 
 
 # ============================================================
-# Random worker endpoint
+# DATASET STATUS
 # ============================================================
 
-@app.get("/random-worker")
-def random_worker():
+@app.get("/debug/dataset")
+def dataset_status():
+
+    workers_path = get_workers_path()
+
+    workers = load_workers()
+
+    if not workers:
+        return {
+            "dataset": str(workers_path),
+            "workers": 0,
+            "status": "empty",
+        }
+
+    first_worker = workers[0]
+
+    income_columns = [
+        key
+        for key in first_worker.keys()
+        if "income" in key.lower()
+    ]
+
+    jobs_columns = [
+        key
+        for key in first_worker.keys()
+        if "jobs" in key.lower()
+    ]
+
+    return {
+        "dataset": str(workers_path),
+        "workers": len(workers),
+        "income_columns": income_columns,
+        "jobs_columns": jobs_columns,
+        "status": "loaded",
+    }
+
+
+# ============================================================
+# SEARCH WORKERS
+# ============================================================
+
+@app.get("/search")
+def search_workers(
+    q: str = Query(
+        ...,
+        min_length=1,
+        description="Worker name, phone number, or worker ID",
+    )
+):
 
     try:
+
         workers = load_workers()
         identities = load_identities()
 
-        if not workers:
-            raise HTTPException(
-                status_code=404,
-                detail="Worker dataset is empty.",
+        query = q.strip().lower()
+
+        if not query:
+            return {
+                "workers": []
+            }
+
+        results = []
+
+        for row in workers:
+
+            worker_id = row.get(
+                "worker_id",
+                ""
+            ).strip()
+
+            identity = identities.get(worker_id)
+
+            if identity is None:
+                continue
+
+            name = identity.get(
+                "name",
+                ""
             )
 
-        # Select a real worker from our synthetic dataset.
-        row = random.choice(workers)
-
-        worker = convert_worker(row)
-
-        worker_id = worker["worker_id"]
-
-        identity = identities.get(worker_id)
-
-        if identity is None:
-            raise HTTPException(
-                status_code=404,
-                detail=(
-                    f"No identity found for worker "
-                    f"{worker_id}."
-                ),
+            phone = identity.get(
+                "phone",
+                ""
             )
 
-        # Add identity information.
-        worker["name"] = identity["name"]
-        worker["phone"] = identity["phone"]
+            searchable_values = [
+                name.lower(),
+                phone.lower(),
+                worker_id.lower(),
+            ]
 
-        return worker
+            if any(
+                query in value
+                for value in searchable_values
+            ):
 
-    except HTTPException:
-        raise
+                results.append({
+                    "worker_id": worker_id,
+                    "name": name,
+                    "phone": phone,
+                    "platform": row.get(
+                        "platform",
+                        "Unknown",
+                    ),
+                    "tenure_months": safe_int(
+                        row.get("tenure_months")
+                    ),
+                })
+
+        results = results[:8]
+
+        return {
+            "workers": results
+        }
 
     except Exception as error:
+
         raise HTTPException(
             status_code=500,
             detail=str(error),
@@ -286,37 +509,62 @@ def random_worker():
 
 
 # ============================================================
-# Worker lookup endpoint
+# WORKER PROFILE
 # ============================================================
 
 @app.get("/worker/{worker_id}")
 def get_worker(worker_id: str):
 
     try:
+
         workers = load_workers()
         identities = load_identities()
 
         matching_worker = None
 
+        requested_id = worker_id.strip().lower()
+
         for row in workers:
-            if row["worker_id"] == worker_id:
+
+            current_id = row.get(
+                "worker_id",
+                ""
+            ).strip()
+
+            if current_id.lower() == requested_id:
+
                 matching_worker = row
                 break
 
         if matching_worker is None:
+
             raise HTTPException(
                 status_code=404,
                 detail="Worker not found.",
             )
 
-        worker = convert_worker(matching_worker)
+        worker = convert_worker(
+            matching_worker
+        )
 
-        identity = identities.get(worker_id)
+        identity = identities.get(
+            worker["worker_id"]
+        )
 
         if identity:
-            worker["name"] = identity["name"]
-            worker["phone"] = identity["phone"]
+
+            worker["name"] = identity.get(
+                "name",
+                "Unknown",
+            )
+
+            worker["phone"] = identity.get(
+                "phone",
+                "Not available",
+            )
+
         else:
+
             worker["name"] = "Unknown"
             worker["phone"] = "Not available"
 
@@ -326,6 +574,7 @@ def get_worker(worker_id: str):
         raise
 
     except Exception as error:
+
         raise HTTPException(
             status_code=500,
             detail=str(error),
@@ -333,21 +582,30 @@ def get_worker(worker_id: str):
 
 
 # ============================================================
-# Scoring endpoint
+# SCORE
 # ============================================================
 
 @app.post("/score")
 def score_worker(worker: WorkerProfile):
 
-    result = predict_worker(
-        worker.model_dump()
-    )
+    try:
 
-    return result
+        result = predict_worker(
+            worker.model_dump()
+        )
+
+        return result
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(error),
+        )
 
 
 # ============================================================
-# Local development
+# LOCAL DEVELOPMENT
 # ============================================================
 
 if __name__ == "__main__":

@@ -39,7 +39,7 @@ function App() {
   }
 
   // ==========================================================
-  // LIVE LENDER SEARCH
+  // LIVE SEARCH DROPDOWN
   // ==========================================================
 
   useEffect(() => {
@@ -109,7 +109,7 @@ function App() {
   }, []);
 
   // ==========================================================
-  // SEARCH WORKERS
+  // LENDER SEARCH
   // ==========================================================
 
   async function searchWorkers(event) {
@@ -120,7 +120,9 @@ function App() {
     const query = searchQuery.trim();
 
     if (!query) {
-      setError("Enter a worker name or phone number.");
+      setError(
+        "Enter a worker name, phone number, or worker ID."
+      );
       return;
     }
 
@@ -141,14 +143,17 @@ function App() {
       }
 
       const data = await response.json();
-      const workers = data.workers || [];
 
-      setSearchResults(workers);
+      setSearchResults(data.workers || []);
 
-      if (workers.length === 0) {
-        setError("No worker found matching your search.");
-      } else if (workers.length === 1) {
-        await selectWorker(workers[0].worker_id);
+      if (!data.workers || data.workers.length === 0) {
+        setError(
+          "No worker found matching your search."
+        );
+      } else if (data.workers.length === 1) {
+        await selectWorker(
+          data.workers[0].worker_id
+        );
       }
     } catch (err) {
       console.error(err);
@@ -165,7 +170,7 @@ function App() {
   }
 
   // ==========================================================
-  // LOAD WORKER PROFILE + SCORE
+  // LOAD WORKER PROFILE
   // ==========================================================
 
   async function selectWorker(workerId) {
@@ -180,34 +185,43 @@ function App() {
       );
 
       if (!workerResponse.ok) {
-        throw new Error("Could not load worker profile.");
-      }
-
-      const workerData = await workerResponse.json();
-
-      setWorker(workerData);
-
-      const scoreResponse = await fetch(`${API_URL}/score`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(workerData),
-      });
-
-      if (!scoreResponse.ok) {
-        const message = await scoreResponse.text();
-
         throw new Error(
-          message || "Could not calculate GigScore."
+          "Could not load worker profile."
         );
       }
 
-      const scoreData = await scoreResponse.json();
+      const workerData =
+        await workerResponse.json();
+
+      setWorker(workerData);
+
+      const scoreResponse = await fetch(
+        `${API_URL}/score`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(workerData),
+        }
+      );
+
+      if (!scoreResponse.ok) {
+        const message =
+          await scoreResponse.text();
+
+        throw new Error(
+          message ||
+            "Could not calculate GigScore."
+        );
+      }
+
+      const scoreData =
+        await scoreResponse.json();
 
       setResult(scoreData);
 
-      setSearchQuery(workerData.name || "");
+      setSearchQuery(workerData.name);
     } catch (err) {
       console.error(err);
 
@@ -221,7 +235,7 @@ function App() {
   }
 
   // ==========================================================
-  // CLEAR SEARCH
+  // CLEAR LENDER SEARCH
   // ==========================================================
 
   function clearSearch() {
@@ -290,7 +304,9 @@ function App() {
                 ? "view-button active"
                 : "view-button"
             }
-            onClick={() => switchView("lender")}
+            onClick={() =>
+              switchView("lender")
+            }
           >
             Lender View
           </button>
@@ -301,7 +317,9 @@ function App() {
                 ? "view-button active"
                 : "view-button"
             }
-            onClick={() => switchView("worker")}
+            onClick={() =>
+              switchView("worker")
+            }
           >
             Worker View
           </button>
@@ -369,12 +387,17 @@ function App() {
                   type="text"
                   value={searchQuery}
                   onChange={(event) => {
-                    setSearchQuery(event.target.value);
+                    setSearchQuery(
+                      event.target.value
+                    );
+
                     setError("");
                     setSearched(false);
                   }}
                   onFocus={() => {
-                    if (searchResults.length > 0) {
+                    if (
+                      searchResults.length > 0
+                    ) {
                       setShowDropdown(true);
                     }
                   }}
@@ -415,54 +438,63 @@ function App() {
 
                       {!searching &&
                         searchResults.length > 0 && (
+
                           <>
                             <div className="dropdown-heading">
                               WORKERS
                             </div>
 
-                            {searchResults.map((candidate) => (
+                            {searchResults.map(
+                              (candidate) => (
 
-                              <button
-                                type="button"
-                                className="dropdown-worker"
-                                key={candidate.worker_id}
-                                onClick={() =>
-                                  selectWorker(
+                                <button
+                                  type="button"
+                                  className="dropdown-worker"
+                                  key={
                                     candidate.worker_id
-                                  )
-                                }
-                              >
+                                  }
+                                  onClick={() =>
+                                    selectWorker(
+                                      candidate.worker_id
+                                    )
+                                  }
+                                >
 
-                                <div className="dropdown-avatar">
-                                  {getInitials(candidate.name)}
-                                </div>
+                                  <div className="dropdown-avatar">
+                                    {getInitials(
+                                      candidate.name
+                                    )}
+                                  </div>
 
-                                <div className="dropdown-details">
+                                  <div className="dropdown-details">
 
-                                  <strong>
-                                    {candidate.name}
-                                  </strong>
+                                    <strong>
+                                      {candidate.name}
+                                    </strong>
 
-                                  <span>
-                                    {candidate.phone}
-                                  </span>
+                                    <span>
+                                      {candidate.phone}
+                                    </span>
 
-                                  <small>
-                                    {candidate.worker_id}
-                                    {" · "}
-                                    {candidate.platform}
-                                  </small>
+                                    <small>
+                                      {candidate.worker_id}
+                                      {" · "}
+                                      {candidate.platform}
+                                    </small>
 
-                                </div>
+                                  </div>
 
-                                <div className="dropdown-arrow">
-                                  →
-                                </div>
+                                  <div className="dropdown-arrow">
+                                    →
+                                  </div>
 
-                              </button>
+                                </button>
 
-                            ))}
+                              )
+                            )}
+
                           </>
+
                         )}
 
                     </div>
@@ -485,10 +517,6 @@ function App() {
 
           </section>
 
-
-          {/* ====================================================
-              ERROR
-          ==================================================== */}
 
           {error && (
 
@@ -513,7 +541,10 @@ function App() {
                 {error.includes("backend") && (
                   <small>
                     Make sure FastAPI is running on{" "}
-                    <code>127.0.0.1:8000</code>.
+                    <code>
+                      127.0.0.1:8000
+                    </code>
+                    .
                   </small>
                 )}
 
@@ -523,10 +554,6 @@ function App() {
 
           )}
 
-
-          {/* ====================================================
-              SEARCH RESULTS
-          ==================================================== */}
 
           {searchResults.length > 0 &&
             !worker &&
@@ -560,50 +587,56 @@ function App() {
 
                 <div className="worker-results">
 
-                  {searchResults.map((candidate) => (
+                  {searchResults.map(
+                    (candidate) => (
 
-                    <button
-                      className="worker-result"
-                      key={candidate.worker_id}
-                      onClick={() =>
-                        selectWorker(
+                      <button
+                        className="worker-result"
+                        key={
                           candidate.worker_id
-                        )
-                      }
-                    >
+                        }
+                        onClick={() =>
+                          selectWorker(
+                            candidate.worker_id
+                          )
+                        }
+                      >
 
-                      <div className="result-avatar">
-                        {getInitials(candidate.name)}
-                      </div>
+                        <div className="result-avatar">
+                          {getInitials(
+                            candidate.name
+                          )}
+                        </div>
 
-                      <div className="result-details">
+                        <div className="result-details">
 
-                        <strong>
-                          {candidate.name}
-                        </strong>
+                          <strong>
+                            {candidate.name}
+                          </strong>
 
-                        <span>
-                          {candidate.phone}
-                        </span>
+                          <span>
+                            {candidate.phone}
+                          </span>
 
-                        <small>
-                          {candidate.worker_id}
-                          {" · "}
-                          {candidate.platform}
-                          {" · "}
-                          {candidate.tenure_months}
-                          {" months"}
-                        </small>
+                          <small>
+                            {candidate.worker_id}
+                            {" · "}
+                            {candidate.platform}
+                            {" · "}
+                            {candidate.tenure_months}
+                            {" months"}
+                          </small>
 
-                      </div>
+                        </div>
 
-                      <div className="result-arrow">
-                        →
-                      </div>
+                        <div className="result-arrow">
+                          →
+                        </div>
 
-                    </button>
+                      </button>
 
-                  ))}
+                    )
+                  )}
 
                 </div>
 
@@ -611,10 +644,6 @@ function App() {
 
             )}
 
-
-          {/* ====================================================
-              EMPTY STATE
-          ==================================================== */}
 
           {!searched &&
             !worker &&
@@ -632,24 +661,23 @@ function App() {
 
                 <p>
                   Find a gig worker using their
-                  name or phone number to view
-                  their behavioural reliability
-                  profile.
+                  name, phone number, or worker ID
+                  to view their behavioural
+                  reliability profile.
                 </p>
 
                 <div className="search-examples">
+
                   <span>NAME</span>
                   <span>PHONE</span>
+                  <span>WORKER ID</span>
+
                 </div>
 
               </section>
 
             )}
 
-
-          {/* ====================================================
-              LOADING
-          ==================================================== */}
 
           {loadingScore && (
 
@@ -671,10 +699,6 @@ function App() {
 
           )}
 
-
-          {/* ====================================================
-              PROFILE
-          ==================================================== */}
 
           {worker &&
             result &&
@@ -708,7 +732,11 @@ function App() {
           loadingScore={loadingScore}
           error={error}
           setError={setError}
-          clearWorker={clearSearch}
+          clearWorker={() => {
+            setWorker(null);
+            setResult(null);
+            setError("");
+          }}
         />
 
       )}
@@ -730,6 +758,7 @@ function LenderProfile({
 }) {
 
   return (
+
     <>
 
       <section className="profile-row">
@@ -773,6 +802,7 @@ function LenderProfile({
           </button>
 
         </div>
+
 
         <div className="evidence-card">
 
@@ -822,6 +852,7 @@ function LenderProfile({
       </section>
 
     </>
+
   );
 }
 
@@ -841,87 +872,32 @@ function WorkerView({
   clearWorker,
 }) {
 
-  const [workerSearch, setWorkerSearch] = useState("");
-  const [workerSearchResults, setWorkerSearchResults] =
-    useState([]);
+  const [workerId, setWorkerId] = useState("");
 
-  const [workerSearching, setWorkerSearching] =
-    useState(false);
+  async function handleWorkerLogin(event) {
 
-  const [workerSearched, setWorkerSearched] =
-    useState(false);
-
-  // ==========================================================
-  // WORKER SEARCH
-  // ==========================================================
-
-  async function handleWorkerSearch(event) {
     event.preventDefault();
 
-    const query = workerSearch.trim();
+    const id = workerId.trim();
 
-    if (!query) {
+    if (!id) {
+
       setError(
-        "Enter your name or phone number."
+        "Enter your GigScore Worker ID."
       );
+
       return;
     }
 
     setError("");
-    setWorkerSearching(true);
-    setWorkerSearched(true);
 
-    try {
-      const response = await fetch(
-        `${API_URL}/search?q=${encodeURIComponent(query)}`
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          "Could not search workers."
-        );
-      }
-
-      const data = await response.json();
-
-      const workers = data.workers || [];
-
-      setWorkerSearchResults(workers);
-
-      if (workers.length === 0) {
-        setError(
-          "No worker found matching your name or phone number."
-        );
-      }
-
-      if (workers.length === 1) {
-        await onLoadWorker(
-          workers[0].worker_id
-        );
-      }
-
-    } catch (err) {
-      console.error(err);
-
-      setWorkerSearchResults([]);
-
-      setError(
-        err.message ||
-          "Unable to connect to the GigScore backend."
-      );
-    } finally {
-      setWorkerSearching(false);
-    }
+    await onLoadWorker(id);
   }
-
-
-  // ==========================================================
-  // LOADING
-  // ==========================================================
 
   if (loadingScore) {
 
     return (
+
       <main className="worker-dashboard">
 
         <section className="worker-loading">
@@ -951,17 +927,14 @@ function WorkerView({
         </section>
 
       </main>
+
     );
   }
-
-
-  // ==========================================================
-  // WORKER LANDING / SEARCH
-  // ==========================================================
 
   if (!worker || !result) {
 
     return (
+
       <main className="worker-dashboard">
 
         <section className="worker-hero">
@@ -1012,13 +985,9 @@ function WorkerView({
           </div>
 
 
-          {/* ==================================================
-              WORKER SEARCH CARD
-          ================================================== */}
-
           <form
             className="worker-access-card"
-            onSubmit={handleWorkerSearch}
+            onSubmit={handleWorkerLogin}
           >
 
             <div className="worker-access-icon">
@@ -1026,7 +995,7 @@ function WorkerView({
             </div>
 
             <p className="eyebrow">
-              FIND YOUR PROFILE
+              ACCESS YOUR PROFILE
             </p>
 
             <h2>
@@ -1034,134 +1003,50 @@ function WorkerView({
             </h2>
 
             <p className="worker-access-copy">
-              Search for your profile using
-              your name or phone number.
+              Enter your GigScore Worker ID to
+              view your reliability profile.
             </p>
 
             <label>
-              NAME OR PHONE NUMBER
+              WORKER ID
             </label>
 
             <input
               type="text"
-              value={workerSearch}
-              onChange={(event) => {
-                setWorkerSearch(event.target.value);
-                setError("");
-                setWorkerSearched(false);
-              }}
-              placeholder="Search worker"
+              value={workerId}
+              onChange={(event) =>
+                setWorkerId(
+                  event.target.value.toUpperCase()
+                )
+              }
+              placeholder="e.g. W00014"
               autoComplete="off"
             />
 
             {error && (
+
               <div className="worker-error">
                 {error}
               </div>
+
             )}
 
             <button
               className="worker-primary-button"
               type="submit"
-              disabled={workerSearching}
             >
-              {workerSearching
-                ? "Searching..."
-                : "Find my profile"}
-
-              <span>
-                →
-              </span>
+              View my GigScore
+              <span>→</span>
             </button>
 
             <small className="worker-access-note">
-              Search using the name or phone
-              number registered with GigScore.
+              Demo access uses a Worker ID from
+              the GigScore prototype dataset.
             </small>
 
           </form>
 
         </section>
-
-
-        {/* ====================================================
-            WORKER SEARCH RESULTS
-        ==================================================== */}
-
-        {workerSearched &&
-          workerSearchResults.length > 0 && (
-
-            <section className="search-results-card worker-search-results">
-
-              <div className="section-heading compact">
-
-                <div>
-
-                  <p className="eyebrow">
-                    PROFILES FOUND
-                  </p>
-
-                  <h2>
-                    Select your profile
-                  </h2>
-
-                </div>
-
-              </div>
-
-              <div className="worker-results">
-
-                {workerSearchResults.map(
-                  (candidate) => (
-
-                    <button
-                      className="worker-result"
-                      key={candidate.worker_id}
-                      onClick={() =>
-                        onLoadWorker(
-                          candidate.worker_id
-                        )
-                      }
-                    >
-
-                      <div className="result-avatar">
-                        {getInitials(
-                          candidate.name
-                        )}
-                      </div>
-
-                      <div className="result-details">
-
-                        <strong>
-                          {candidate.name}
-                        </strong>
-
-                        <span>
-                          {candidate.phone}
-                        </span>
-
-                        <small>
-                          {candidate.platform}
-                          {" · "}
-                          {candidate.worker_id}
-                        </small>
-
-                      </div>
-
-                      <div className="result-arrow">
-                        →
-                      </div>
-
-                    </button>
-
-                  )
-                )}
-
-              </div>
-
-            </section>
-
-          )}
 
 
         <section className="worker-feature-grid">
@@ -1224,15 +1109,13 @@ function WorkerView({
         </section>
 
       </main>
+
     );
   }
 
 
-  // ==========================================================
-  // WORKER PROFILE
-  // ==========================================================
-
   return (
+
     <main className="worker-dashboard">
 
       {/* ======================================================
@@ -1253,17 +1136,9 @@ function WorkerView({
               YOUR GIGSCORE PROFILE
             </p>
 
-            <div className="worker-name-row">
-
-              <h1>
-                {worker.name}
-              </h1>
-
-              <span className="worker-phone-inline">
-                {worker.phone}
-              </span>
-
-            </div>
+            <h1>
+              {worker.name}
+            </h1>
 
             <p className="worker-id-line">
               {worker.platform}
@@ -1394,6 +1269,7 @@ function WorkerView({
 
         </div>
 
+
         <div className="history-grid">
 
           <HistoryChart
@@ -1467,9 +1343,7 @@ function WorkerView({
           }
         >
           Explore improvements
-          <span>
-            →
-          </span>
+          <span>→</span>
         </button>
 
       </section>
@@ -1504,15 +1378,12 @@ function WorkerView({
         </div>
 
         <div className="consent-status">
-
           <span>
             No lender access
           </span>
-
           <small>
             Consent system coming next
           </small>
-
         </div>
 
       </section>
@@ -1526,7 +1397,7 @@ function WorkerView({
         className="worker-reset-button"
         onClick={clearWorker}
       >
-        ← Search another worker
+        ← View another Worker ID
       </button>
 
 
@@ -1547,6 +1418,7 @@ function WorkerView({
       </section>
 
     </main>
+
   );
 }
 
@@ -1558,6 +1430,7 @@ function WorkerView({
 function ScoreCard({ result }) {
 
   return (
+
     <div className="score-card">
 
       <div className="profile-label">
@@ -1585,17 +1458,19 @@ function ScoreCard({ result }) {
       </p>
 
     </div>
+
   );
 }
 
 
 // ============================================================
-// METRICS GRID
+// METRICS
 // ============================================================
 
 function MetricsGrid({ worker }) {
 
   return (
+
     <div className="metrics-grid">
 
       <Metric
@@ -1608,40 +1483,55 @@ function MetricsGrid({ worker }) {
 
       <Metric
         label="Completion rate"
-        value={`${Math.round(
-          worker.completion_rate * 100
-        )}%`}
+        value={
+          `${Math.round(
+            worker.completion_rate * 100
+          )}%`
+        }
       />
 
       <Metric
         label="Cancellation rate"
-        value={`${Math.round(
-          worker.cancellation_rate * 100
-        )}%`}
+        value={
+          `${Math.round(
+            worker.cancellation_rate * 100
+          )}%`
+        }
       />
 
       <Metric
         label="Lifetime jobs"
-        value={Number(
-          worker.jobs_completed
-        ).toLocaleString()}
+        value={
+          Number(
+            worker.jobs_completed
+          ).toLocaleString()
+        }
       />
 
       <Metric
         label="Average income"
-        value={formatCurrency(
-          average(worker.monthly_income)
-        )}
+        value={
+          formatCurrency(
+            average(
+              worker.monthly_income
+            )
+          )
+        }
       />
 
       <Metric
         label="Average monthly jobs"
-        value={Math.round(
-          average(worker.monthly_jobs)
-        )}
+        value={
+          Math.round(
+            average(
+              worker.monthly_jobs
+            )
+          )
+        }
       />
 
     </div>
+
   );
 }
 
@@ -1657,6 +1547,7 @@ function Metric({
 }) {
 
   return (
+
     <div className="metric-card">
 
       <div className="metric-label">
@@ -1668,14 +1559,17 @@ function Metric({
         {value}
 
         {suffix && (
+
           <span className="metric-suffix">
             {suffix}
           </span>
+
         )}
 
       </div>
 
     </div>
+
   );
 }
 
@@ -1690,12 +1584,14 @@ function HistoryChart({
   formatter,
 }) {
 
-  const max = Math.max(
-    ...(values || [1]),
-    1
-  );
+  const max =
+    Math.max(
+      ...(values || [1]),
+      1
+    );
 
   return (
+
     <div className="history-card">
 
       <div className="history-card-header">
@@ -1710,7 +1606,6 @@ function HistoryChart({
             {formatter(
               average(values)
             )}
-
             <span>
               {" "}average
             </span>
@@ -1726,12 +1621,14 @@ function HistoryChart({
         {(values || []).map(
           (value, index) => {
 
-            const height = Math.max(
-              5,
-              (value / max) * 100
-            );
+            const height =
+              Math.max(
+                5,
+                (value / max) * 100
+              );
 
             return (
+
               <div
                 className="history-bar-column"
                 key={index}
@@ -1750,7 +1647,9 @@ function HistoryChart({
                 </span>
 
               </div>
+
             );
+
           }
         )}
 
@@ -1761,6 +1660,7 @@ function HistoryChart({
       </div>
 
     </div>
+
   );
 }
 
@@ -1772,6 +1672,7 @@ function HistoryChart({
 function Explanation({ result }) {
 
   return (
+
     <section className="explanation-card">
 
       <div className="section-heading">
@@ -1800,17 +1701,22 @@ function Explanation({ result }) {
         <FactorColumn
           title="Positive contributors"
           positive
-          factors={result.positive_factors}
+          factors={
+            result.positive_factors
+          }
         />
 
         <FactorColumn
           title="Areas requiring attention"
-          factors={result.risk_factors}
+          factors={
+            result.risk_factors
+          }
         />
 
       </div>
 
     </section>
+
   );
 }
 
@@ -1826,6 +1732,7 @@ function FactorColumn({
 }) {
 
   return (
+
     <div className="factor-column">
 
       <div
@@ -1855,7 +1762,9 @@ function FactorColumn({
 
               <div
                 className="factor"
-                key={`${factor.feature}-${index}`}
+                key={
+                  `${factor.feature}-${index}`
+                }
               >
 
                 <div className="factor-main">
@@ -1895,6 +1804,7 @@ function FactorColumn({
       )}
 
     </div>
+
   );
 }
 
