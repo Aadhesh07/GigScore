@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
+
 const API_URL = "https://gigscore-xogt.onrender.com";
 
 function App() {
