@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://gigscore-xogt.onrender.com";
 
 function App() {
-  const [view, setView] = useState("lender");
+  const [view, setView] = useState("home");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -22,25 +22,17 @@ function App() {
 
   const searchRef = useRef(null);
 
-  // ==========================================================
+  // ============================================================
   // SWITCH VIEW
-  // ==========================================================
+  // ============================================================
 
   function switchView(newView) {
     setView(newView);
-
-    setSearchQuery("");
-    setSearchResults([]);
-    setWorker(null);
-    setResult(null);
-    setError("");
-    setSearched(false);
-    setShowDropdown(false);
   }
 
-  // ==========================================================
+  // ============================================================
   // LIVE LENDER SEARCH
-  // ==========================================================
+  // ============================================================
 
   useEffect(() => {
     if (view !== "lender") {
@@ -84,9 +76,9 @@ function App() {
     return () => clearTimeout(timer);
   }, [searchQuery, view]);
 
-  // ==========================================================
-  // CLOSE DROPDOWN
-  // ==========================================================
+  // ============================================================
+  // CLOSE SEARCH DROPDOWN
+  // ============================================================
 
   useEffect(() => {
     function handleOutsideClick(event) {
@@ -108,9 +100,9 @@ function App() {
     };
   }, []);
 
-  // ==========================================================
-  // SEARCH WORKERS
-  // ==========================================================
+  // ============================================================
+  // LENDER SEARCH
+  // ============================================================
 
   async function searchWorkers(event) {
     if (event) {
@@ -120,7 +112,9 @@ function App() {
     const query = searchQuery.trim();
 
     if (!query) {
-      setError("Enter a worker name or phone number.");
+      setError(
+        "Enter a worker name, phone number, or worker ID."
+      );
       return;
     }
 
@@ -146,7 +140,9 @@ function App() {
       setSearchResults(workers);
 
       if (workers.length === 0) {
-        setError("No worker found matching your search.");
+        setError(
+          "No worker found matching your search."
+        );
       } else if (workers.length === 1) {
         await selectWorker(workers[0].worker_id);
       }
@@ -164,9 +160,9 @@ function App() {
     }
   }
 
-  // ==========================================================
+  // ============================================================
   // LOAD WORKER PROFILE + SCORE
-  // ==========================================================
+  // ============================================================
 
   async function selectWorker(workerId) {
     setShowDropdown(false);
@@ -180,34 +176,45 @@ function App() {
       );
 
       if (!workerResponse.ok) {
-        throw new Error("Could not load worker profile.");
-      }
-
-      const workerData = await workerResponse.json();
-
-      setWorker(workerData);
-
-      const scoreResponse = await fetch(`${API_URL}/score`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(workerData),
-      });
-
-      if (!scoreResponse.ok) {
-        const message = await scoreResponse.text();
-
         throw new Error(
-          message || "Could not calculate GigScore."
+          "Could not load worker profile."
         );
       }
 
-      const scoreData = await scoreResponse.json();
+      const workerData =
+        await workerResponse.json();
+
+      setWorker(workerData);
+
+      const scoreResponse = await fetch(
+        `${API_URL}/score`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(workerData),
+        }
+      );
+
+      if (!scoreResponse.ok) {
+        const message =
+          await scoreResponse.text();
+
+        throw new Error(
+          message ||
+            "Could not calculate GigScore."
+        );
+      }
+
+      const scoreData =
+        await scoreResponse.json();
 
       setResult(scoreData);
 
-      setSearchQuery(workerData.name || "");
+      setSearchQuery(
+        workerData.name || workerData.phone || workerId
+      );
     } catch (err) {
       console.error(err);
 
@@ -220,9 +227,9 @@ function App() {
     }
   }
 
-  // ==========================================================
-  // CLEAR SEARCH
-  // ==========================================================
+  // ============================================================
+  // CLEAR LENDER SEARCH
+  // ============================================================
 
   function clearSearch() {
     setSearchQuery("");
@@ -234,9 +241,9 @@ function App() {
     setShowDropdown(false);
   }
 
-  // ==========================================================
+  // ============================================================
   // INITIALS
-  // ==========================================================
+  // ============================================================
 
   function getInitials(name) {
     if (!name) {
@@ -245,15 +252,16 @@ function App() {
 
     return name
       .split(" ")
+      .filter(Boolean)
       .map((part) => part[0])
       .slice(0, 2)
       .join("")
       .toUpperCase();
   }
 
-  // ==========================================================
-  // MAIN
-  // ==========================================================
+  // ============================================================
+  // MAIN APP
+  // ============================================================
 
   return (
     <div className="app">
@@ -286,11 +294,26 @@ function App() {
 
           <button
             className={
+              view === "home"
+                ? "view-button active"
+                : "view-button"
+            }
+            onClick={() =>
+              switchView("home")
+            }
+          >
+            Home
+          </button>
+
+          <button
+            className={
               view === "lender"
                 ? "view-button active"
                 : "view-button"
             }
-            onClick={() => switchView("lender")}
+            onClick={() =>
+              switchView("lender")
+            }
           >
             Lender View
           </button>
@@ -301,7 +324,9 @@ function App() {
                 ? "view-button active"
                 : "view-button"
             }
-            onClick={() => switchView("worker")}
+            onClick={() =>
+              switchView("worker")
+            }
           >
             Worker View
           </button>
@@ -319,6 +344,26 @@ function App() {
         </div>
 
       </header>
+
+
+
+      {/* ======================================================
+          HOME VIEW
+      ====================================================== */}
+
+      {view === "home" && (
+
+        <HomeView
+          onLender={() =>
+            switchView("lender")
+          }
+          onWorker={() =>
+            switchView("worker")
+          }
+        />
+
+      )}
+
 
 
       {/* ======================================================
@@ -351,6 +396,8 @@ function App() {
 
             </div>
 
+
+
             <form
               className="search-form"
               onSubmit={searchWorkers}
@@ -369,16 +416,21 @@ function App() {
                   type="text"
                   value={searchQuery}
                   onChange={(event) => {
-                    setSearchQuery(event.target.value);
+                    setSearchQuery(
+                      event.target.value
+                    );
+
                     setError("");
                     setSearched(false);
                   }}
                   onFocus={() => {
-                    if (searchResults.length > 0) {
+                    if (
+                      searchResults.length > 0
+                    ) {
                       setShowDropdown(true);
                     }
                   }}
-                  placeholder="Search worker"
+                  placeholder="Search worker by name or phone number"
                   aria-label="Search worker"
                   autoComplete="off"
                 />
@@ -394,6 +446,8 @@ function App() {
                   </button>
 
                 )}
+
+
 
                 {showDropdown &&
                   searchQuery.trim() && (
@@ -415,54 +469,63 @@ function App() {
 
                       {!searching &&
                         searchResults.length > 0 && (
+
                           <>
                             <div className="dropdown-heading">
                               WORKERS
                             </div>
 
-                            {searchResults.map((candidate) => (
+                            {searchResults.map(
+                              (candidate) => (
 
-                              <button
-                                type="button"
-                                className="dropdown-worker"
-                                key={candidate.worker_id}
-                                onClick={() =>
-                                  selectWorker(
+                                <button
+                                  type="button"
+                                  className="dropdown-worker"
+                                  key={
                                     candidate.worker_id
-                                  )
-                                }
-                              >
+                                  }
+                                  onClick={() =>
+                                    selectWorker(
+                                      candidate.worker_id
+                                    )
+                                  }
+                                >
 
-                                <div className="dropdown-avatar">
-                                  {getInitials(candidate.name)}
-                                </div>
+                                  <div className="dropdown-avatar">
+                                    {getInitials(
+                                      candidate.name
+                                    )}
+                                  </div>
 
-                                <div className="dropdown-details">
+                                  <div className="dropdown-details">
 
-                                  <strong>
-                                    {candidate.name}
-                                  </strong>
+                                    <strong>
+                                      {candidate.name}
+                                    </strong>
 
-                                  <span>
-                                    {candidate.phone}
-                                  </span>
+                                    <span>
+                                      {candidate.phone}
+                                    </span>
 
-                                  <small>
-                                    {candidate.worker_id}
-                                    {" · "}
-                                    {candidate.platform}
-                                  </small>
+                                    <small>
+                                      {candidate.worker_id}
+                                      {" · "}
+                                      {candidate.platform}
+                                    </small>
 
-                                </div>
+                                  </div>
 
-                                <div className="dropdown-arrow">
-                                  →
-                                </div>
+                                  <div className="dropdown-arrow">
+                                    →
+                                  </div>
 
-                              </button>
+                                </button>
 
-                            ))}
+                              )
+                            )}
+
                           </>
+
                         )}
 
                     </div>
@@ -470,6 +533,8 @@ function App() {
                   )}
 
               </div>
+
+
 
               <button
                 className="primary-button"
@@ -486,9 +551,8 @@ function App() {
           </section>
 
 
-          {/* ====================================================
-              ERROR
-          ==================================================== */}
+
+          {/* ERROR */}
 
           {error && (
 
@@ -513,7 +577,10 @@ function App() {
                 {error.includes("backend") && (
                   <small>
                     Make sure FastAPI is running on{" "}
-                    <code>127.0.0.1:8000</code>.
+                    <code>
+                      127.0.0.1:8000
+                    </code>
+                    .
                   </small>
                 )}
 
@@ -524,9 +591,8 @@ function App() {
           )}
 
 
-          {/* ====================================================
-              SEARCH RESULTS
-          ==================================================== */}
+
+          {/* SEARCH RESULTS */}
 
           {searchResults.length > 0 &&
             !worker &&
@@ -558,52 +624,60 @@ function App() {
 
                 </div>
 
+
+
                 <div className="worker-results">
 
-                  {searchResults.map((candidate) => (
+                  {searchResults.map(
+                    (candidate) => (
 
-                    <button
-                      className="worker-result"
-                      key={candidate.worker_id}
-                      onClick={() =>
-                        selectWorker(
+                      <button
+                        className="worker-result"
+                        key={
                           candidate.worker_id
-                        )
-                      }
-                    >
+                        }
+                        onClick={() =>
+                          selectWorker(
+                            candidate.worker_id
+                          )
+                        }
+                      >
 
-                      <div className="result-avatar">
-                        {getInitials(candidate.name)}
-                      </div>
+                        <div className="result-avatar">
+                          {getInitials(
+                            candidate.name
+                          )}
+                        </div>
 
-                      <div className="result-details">
+                        <div className="result-details">
 
-                        <strong>
-                          {candidate.name}
-                        </strong>
+                          <strong>
+                            {candidate.name}
+                          </strong>
 
-                        <span>
-                          {candidate.phone}
-                        </span>
+                          <span>
+                            {candidate.phone}
+                          </span>
 
-                        <small>
-                          {candidate.worker_id}
-                          {" · "}
-                          {candidate.platform}
-                          {" · "}
-                          {candidate.tenure_months}
-                          {" months"}
-                        </small>
+                          <small>
+                            {candidate.worker_id}
+                            {" · "}
+                            {candidate.platform}
+                            {" · "}
+                            {candidate.tenure_months}
+                            {" months"}
+                          </small>
 
-                      </div>
+                        </div>
 
-                      <div className="result-arrow">
-                        →
-                      </div>
+                        <div className="result-arrow">
+                          →
+                        </div>
 
-                    </button>
+                      </button>
 
-                  ))}
+                    )
+                  )}
 
                 </div>
 
@@ -612,9 +686,8 @@ function App() {
             )}
 
 
-          {/* ====================================================
-              EMPTY STATE
-          ==================================================== */}
+
+          {/* EMPTY STATE */}
 
           {!searched &&
             !worker &&
@@ -632,14 +705,17 @@ function App() {
 
                 <p>
                   Find a gig worker using their
-                  name or phone number to view
-                  their behavioural reliability
-                  profile.
+                  name, phone number, or worker ID
+                  to view their behavioural
+                  reliability profile.
                 </p>
 
                 <div className="search-examples">
+
                   <span>NAME</span>
                   <span>PHONE</span>
+                  <span>WORKER ID</span>
+
                 </div>
 
               </section>
@@ -647,9 +723,8 @@ function App() {
             )}
 
 
-          {/* ====================================================
-              LOADING
-          ==================================================== */}
+
+          {/* LOADING */}
 
           {loadingScore && (
 
@@ -672,9 +747,8 @@ function App() {
           )}
 
 
-          {/* ====================================================
-              PROFILE
-          ==================================================== */}
+
+          {/* PROFILE */}
 
           {worker &&
             result &&
@@ -694,28 +768,259 @@ function App() {
       )}
 
 
+
       {/* ======================================================
           WORKER VIEW
       ====================================================== */}
 
-      {view === "worker" && (
+      <div
+        style={{
+          display: view === "worker"
+            ? "block"
+            : "none",
+        }}
+      >
 
         <WorkerView
           getInitials={getInitials}
           onLoadWorker={selectWorker}
+          active={view === "worker"}
           worker={worker}
           result={result}
           loadingScore={loadingScore}
           error={error}
           setError={setError}
-          clearWorker={clearSearch}
+          clearWorker={() => {
+            setWorker(null);
+            setResult(null);
+            setError("");
+          }}
         />
 
-      )}
+      </div>
 
     </div>
   );
 }
+
+
+
+// ============================================================
+// HOME VIEW
+// ============================================================
+
+function HomeView({
+  onLender,
+  onWorker,
+}) {
+
+  return (
+
+    <main className="home-dashboard">
+
+      <section className="home-hero">
+
+        <div className="home-hero-copy">
+
+          <p className="eyebrow">
+            GIGSCORE
+          </p>
+
+          <h1>
+            Behavioural intelligence
+            <br />
+            for the gig economy.
+          </h1>
+
+          <p>
+            GigScore converts observable gig-work
+            behaviour into an explainable
+            supplementary reliability signal.
+          </p>
+
+        </div>
+
+      </section>
+
+
+
+      <section className="home-role-section">
+
+        <div className="section-heading">
+
+          <div>
+
+            <p className="eyebrow">
+              CHOOSE YOUR VIEW
+            </p>
+
+            <h2>
+              What would you like to do?
+            </h2>
+
+          </div>
+
+        </div>
+
+
+
+        <div className="home-role-grid">
+
+          <button
+            className="home-role-card"
+            onClick={onLender}
+          >
+
+            <div className="home-role-icon">
+              L
+            </div>
+
+            <div className="home-role-copy">
+
+              <p className="eyebrow">
+                FOR LENDERS
+              </p>
+
+              <h3>
+                Assess a worker
+              </h3>
+
+              <p>
+                Search for a gig worker and
+                understand their behavioural
+                reliability profile.
+              </p>
+
+            </div>
+
+            <span className="home-role-arrow">
+              →
+            </span>
+
+          </button>
+
+
+
+          <button
+            className="home-role-card"
+            onClick={onWorker}
+          >
+
+            <div className="home-role-icon">
+              G
+            </div>
+
+            <div className="home-role-copy">
+
+              <p className="eyebrow">
+                FOR GIG WORKERS
+              </p>
+
+              <h3>
+                View your GigScore
+              </h3>
+
+              <p>
+                Explore your work history,
+                understand your score, and see
+                what influences your profile.
+              </p>
+
+            </div>
+
+            <span className="home-role-arrow">
+              →
+            </span>
+
+          </button>
+
+        </div>
+
+      </section>
+
+
+
+      <section className="home-value-strip">
+
+        <div className="home-value-item">
+
+          <strong>
+            Behaviour-based
+          </strong>
+
+          <span>
+            Observable work signals
+          </span>
+
+        </div>
+
+
+
+        <div className="home-value-item">
+
+          <strong>
+            Explainable
+          </strong>
+
+          <span>
+            Understand what drives the score
+          </span>
+
+        </div>
+
+
+
+        <div className="home-value-item">
+
+          <strong>
+            Supplementary
+          </strong>
+
+          <span>
+            Additional context beyond paperwork
+          </span>
+
+        </div>
+
+
+
+        <div className="home-value-item">
+
+          <strong>
+            Worker-controlled
+          </strong>
+
+          <span>
+            Workers decide profile access
+          </span>
+
+        </div>
+
+      </section>
+
+
+
+      <section className="disclaimer">
+
+        <strong>
+          Prototype notice
+        </strong>
+
+        <span>
+          GigScore is a synthetic-data prototype
+          and supplementary behavioural signal.
+          It is not an official credit score and
+          does not automatically approve or reject
+          loans.
+        </span>
+
+      </section>
+
+    </main>
+
+  );
+}
+
 
 
 // ============================================================
@@ -730,6 +1035,7 @@ function LenderProfile({
 }) {
 
   return (
+
     <>
 
       <section className="profile-row">
@@ -774,6 +1080,8 @@ function LenderProfile({
 
         </div>
 
+
+
         <div className="evidence-card">
 
           <div className="profile-label">
@@ -793,6 +1101,7 @@ function LenderProfile({
       </section>
 
 
+
       <section className="score-layout">
 
         <ScoreCard result={result} />
@@ -802,7 +1111,9 @@ function LenderProfile({
       </section>
 
 
+
       <Explanation result={result} />
+
 
 
       <section className="disclaimer">
@@ -822,8 +1133,10 @@ function LenderProfile({
       </section>
 
     </>
+
   );
 }
+
 
 
 // ============================================================
@@ -833,6 +1146,7 @@ function LenderProfile({
 function WorkerView({
   getInitials,
   onLoadWorker,
+  active,
   worker,
   result,
   loadingScore,
@@ -841,87 +1155,243 @@ function WorkerView({
   clearWorker,
 }) {
 
-  const [workerSearch, setWorkerSearch] = useState("");
+  const [workerQuery, setWorkerQuery] = useState("");
   const [workerSearchResults, setWorkerSearchResults] =
     useState([]);
 
   const [workerSearching, setWorkerSearching] =
     useState(false);
 
-  const [workerSearched, setWorkerSearched] =
+  const [showWorkerResults, setShowWorkerResults] =
     useState(false);
+
+  const [lenderAuthorized, setLenderAuthorized] =
+    useState(false);
+
+  const workerSearchRef = useRef(null);
+
+
+
+  // ==========================================================
+  // WORKER LIVE SEARCH
+  // ==========================================================
+
+  useEffect(() => {
+
+    if (worker || !active) {
+      return;
+    }
+
+    const query = workerQuery.trim();
+
+    if (!query) {
+      setWorkerSearchResults([]);
+      setShowWorkerResults(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+
+      try {
+
+        setWorkerSearching(true);
+
+        const response = await fetch(
+          `${API_URL}/search?q=${encodeURIComponent(query)}`
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            "Could not search workers."
+          );
+        }
+
+        const data =
+          await response.json();
+
+        setWorkerSearchResults(
+          data.workers || []
+        );
+
+        setShowWorkerResults(true);
+
+      } catch (err) {
+
+        console.error(err);
+
+        setWorkerSearchResults([]);
+        setShowWorkerResults(false);
+
+      } finally {
+
+        setWorkerSearching(false);
+
+      }
+
+    }, 250);
+
+    return () => clearTimeout(timer);
+
+  }, [workerQuery, worker, active]);
+
+
+
+  // ==========================================================
+  // CLOSE WORKER SEARCH
+  // ==========================================================
+
+  useEffect(() => {
+
+    function handleOutsideClick(event) {
+
+      if (
+        workerSearchRef.current &&
+        !workerSearchRef.current.contains(
+          event.target
+        )
+      ) {
+
+        setShowWorkerResults(false);
+
+      }
+
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick
+    );
+
+    return () => {
+
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick
+      );
+
+    };
+
+  }, []);
+
+
 
   // ==========================================================
   // WORKER SEARCH
   // ==========================================================
 
   async function handleWorkerSearch(event) {
+
     event.preventDefault();
 
-    const query = workerSearch.trim();
+    const query =
+      workerQuery.trim();
 
     if (!query) {
+
       setError(
-        "Enter your name or phone number."
+        "Enter your name, phone number, or Worker ID."
       );
+
       return;
+
     }
 
     setError("");
     setWorkerSearching(true);
-    setWorkerSearched(true);
+    setShowWorkerResults(false);
 
     try {
+
       const response = await fetch(
         `${API_URL}/search?q=${encodeURIComponent(query)}`
       );
 
       if (!response.ok) {
+
         throw new Error(
           "Could not search workers."
         );
+
       }
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
-      const workers = data.workers || [];
+      const workers =
+        data.workers || [];
 
-      setWorkerSearchResults(workers);
+      setWorkerSearchResults(
+        workers
+      );
 
       if (workers.length === 0) {
-        setError(
-          "No worker found matching your name or phone number."
-        );
-      }
 
-      if (workers.length === 1) {
+        setError(
+          "No worker profile found matching your search."
+        );
+
+      } else if (workers.length === 1) {
+
+        setWorkerQuery(
+          workers[0].name ||
+          workers[0].phone ||
+          workers[0].worker_id
+        );
+
         await onLoadWorker(
           workers[0].worker_id
         );
+
+      } else {
+
+        setShowWorkerResults(true);
+
       }
 
     } catch (err) {
-      console.error(err);
 
-      setWorkerSearchResults([]);
+      console.error(err);
 
       setError(
         err.message ||
           "Unable to connect to the GigScore backend."
       );
+
     } finally {
+
       setWorkerSearching(false);
+
     }
+
   }
 
 
+
   // ==========================================================
-  // LOADING
+  // SELECT WORKER FROM SEARCH
   // ==========================================================
 
-  if (loadingScore) {
+  async function selectWorkerFromSearch(
+    workerId
+  ) {
+
+    setShowWorkerResults(false);
+    setError("");
+
+    await onLoadWorker(workerId);
+
+  }
+
+
+
+  // ==========================================================
+  // LOADING SCREEN
+  // ==========================================================
+
+  if (loadingScore && active) {
 
     return (
+
       <main className="worker-dashboard">
 
         <section className="worker-loading">
@@ -943,7 +1413,7 @@ function WorkerView({
           </h1>
 
           <p>
-            Retrieving your verified work history
+            Retrieving your work history
             and calculating your behavioural
             reliability signal.
           </p>
@@ -951,17 +1421,21 @@ function WorkerView({
         </section>
 
       </main>
+
     );
+
   }
 
 
+
   // ==========================================================
-  // WORKER LANDING / SEARCH
+  // WORKER LOGIN / SEARCH
   // ==========================================================
 
   if (!worker || !result) {
 
     return (
+
       <main className="worker-dashboard">
 
         <section className="worker-hero">
@@ -1012,9 +1486,6 @@ function WorkerView({
           </div>
 
 
-          {/* ==================================================
-              WORKER SEARCH CARD
-          ================================================== */}
 
           <form
             className="worker-access-card"
@@ -1026,142 +1497,177 @@ function WorkerView({
             </div>
 
             <p className="eyebrow">
-              FIND YOUR PROFILE
+              ACCESS YOUR PROFILE
             </p>
 
             <h2>
-              Welcome back
+              Find your profile
             </h2>
 
             <p className="worker-access-copy">
-              Search for your profile using
-              your name or phone number.
+              Search using your name, phone number,
+              or GigScore Worker ID.
             </p>
 
+
+
             <label>
-              NAME OR PHONE NUMBER
+              NAME / PHONE / WORKER ID
             </label>
 
-            <input
-              type="text"
-              value={workerSearch}
-              onChange={(event) => {
-                setWorkerSearch(event.target.value);
-                setError("");
-                setWorkerSearched(false);
-              }}
-              placeholder="Search worker"
-              autoComplete="off"
-            />
+
+
+            <div
+              className="worker-search-wrap"
+              ref={workerSearchRef}
+            >
+
+              <span className="worker-search-icon">
+                ⌕
+              </span>
+
+              <input
+                type="text"
+                value={workerQuery}
+                onChange={(event) => {
+
+                  setWorkerQuery(
+                    event.target.value
+                  );
+
+                  setError("");
+
+                }}
+                onFocus={() => {
+
+                  if (
+                    workerSearchResults.length > 0
+                  ) {
+
+                    setShowWorkerResults(true);
+
+                  }
+
+                }}
+                placeholder="Name, phone number or W00014"
+                autoComplete="off"
+              />
+
+
+
+              {workerSearching && (
+
+                <span className="worker-search-spinner">
+                  ...
+                </span>
+
+              )}
+
+
+
+              {showWorkerResults &&
+                workerSearchResults.length > 0 && (
+
+                  <div className="worker-search-dropdown">
+
+                    <div className="dropdown-heading">
+                      MATCHING PROFILES
+                    </div>
+
+                    {workerSearchResults.map(
+                      (candidate) => (
+
+                        <button
+                          type="button"
+                          className="dropdown-worker"
+                          key={
+                            candidate.worker_id
+                          }
+                          onClick={() =>
+                            selectWorkerFromSearch(
+                              candidate.worker_id
+                            )
+                          }
+                        >
+
+                          <div className="dropdown-avatar">
+                            {getInitials(
+                              candidate.name
+                            )}
+                          </div>
+
+                          <div className="dropdown-details">
+
+                            <strong>
+                              {candidate.name}
+                            </strong>
+
+                            <span>
+                              {candidate.phone}
+                            </span>
+
+                            <small>
+                              {candidate.worker_id}
+                              {" · "}
+                              {candidate.platform}
+                            </small>
+
+                          </div>
+
+                          <div className="dropdown-arrow">
+                            →
+                          </div>
+
+                        </button>
+
+                      )
+                    )}
+
+                  </div>
+
+                )}
+
+            </div>
+
+
 
             {error && (
+
               <div className="worker-error">
                 {error}
               </div>
+
             )}
+
+
 
             <button
               className="worker-primary-button"
               type="submit"
               disabled={workerSearching}
             >
+
               {workerSearching
                 ? "Searching..."
-                : "Find my profile"}
+                : "View my GigScore"}
 
               <span>
                 →
               </span>
+
             </button>
 
+
+
             <small className="worker-access-note">
-              Search using the name or phone
-              number registered with GigScore.
+              Demo access uses profiles from the
+              GigScore prototype dataset.
             </small>
 
           </form>
 
         </section>
 
-
-        {/* ====================================================
-            WORKER SEARCH RESULTS
-        ==================================================== */}
-
-        {workerSearched &&
-          workerSearchResults.length > 0 && (
-
-            <section className="search-results-card worker-search-results">
-
-              <div className="section-heading compact">
-
-                <div>
-
-                  <p className="eyebrow">
-                    PROFILES FOUND
-                  </p>
-
-                  <h2>
-                    Select your profile
-                  </h2>
-
-                </div>
-
-              </div>
-
-              <div className="worker-results">
-
-                {workerSearchResults.map(
-                  (candidate) => (
-
-                    <button
-                      className="worker-result"
-                      key={candidate.worker_id}
-                      onClick={() =>
-                        onLoadWorker(
-                          candidate.worker_id
-                        )
-                      }
-                    >
-
-                      <div className="result-avatar">
-                        {getInitials(
-                          candidate.name
-                        )}
-                      </div>
-
-                      <div className="result-details">
-
-                        <strong>
-                          {candidate.name}
-                        </strong>
-
-                        <span>
-                          {candidate.phone}
-                        </span>
-
-                        <small>
-                          {candidate.platform}
-                          {" · "}
-                          {candidate.worker_id}
-                        </small>
-
-                      </div>
-
-                      <div className="result-arrow">
-                        →
-                      </div>
-
-                    </button>
-
-                  )
-                )}
-
-              </div>
-
-            </section>
-
-          )}
 
 
         <section className="worker-feature-grid">
@@ -1185,6 +1691,7 @@ function WorkerView({
           </div>
 
 
+
           <div className="worker-feature">
 
             <div className="feature-number">
@@ -1202,6 +1709,7 @@ function WorkerView({
             </p>
 
           </div>
+
 
 
           <div className="worker-feature">
@@ -1224,8 +1732,11 @@ function WorkerView({
         </section>
 
       </main>
+
     );
+
   }
+
 
 
   // ==========================================================
@@ -1233,10 +1744,13 @@ function WorkerView({
   // ==========================================================
 
   return (
+
     <main className="worker-dashboard">
 
+
+
       {/* ======================================================
-          WORKER HEADER
+          PROFILE HEADER
       ====================================================== */}
 
       <section className="worker-profile-header">
@@ -1253,17 +1767,15 @@ function WorkerView({
               YOUR GIGSCORE PROFILE
             </p>
 
-            <div className="worker-name-row">
+            <h1>
+              {worker.name}
+            </h1>
 
-              <h1>
-                {worker.name}
-              </h1>
+            {/* PHONE NEXT TO NAME */}
 
-              <span className="worker-phone-inline">
-                {worker.phone}
-              </span>
-
-            </div>
+            <p className="worker-phone-line">
+              {worker.phone}
+            </p>
 
             <p className="worker-id-line">
               {worker.platform}
@@ -1275,6 +1787,8 @@ function WorkerView({
 
         </div>
 
+
+
         <div className="worker-profile-status">
 
           <span className="status-dot" />
@@ -1284,6 +1798,7 @@ function WorkerView({
         </div>
 
       </section>
+
 
 
       {/* ======================================================
@@ -1300,7 +1815,9 @@ function WorkerView({
 
           <div className="worker-score-number">
             {result.score}
-            <span>/ 1000</span>
+            <span>
+              / 1000
+            </span>
           </div>
 
           <div className="worker-tier">
@@ -1312,6 +1829,7 @@ function WorkerView({
           </p>
 
         </div>
+
 
 
         <div className="worker-score-message">
@@ -1329,9 +1847,9 @@ function WorkerView({
             <p>
               Your GigScore is a supplementary
               behavioural signal based on your
-              observable gig-work history. It is
-              designed to give lenders additional
-              context beyond traditional paperwork.
+              observable gig-work history. It gives
+              lenders additional context beyond
+              traditional paperwork.
             </p>
 
           </div>
@@ -1339,6 +1857,7 @@ function WorkerView({
         </div>
 
       </section>
+
 
 
       {/* ======================================================
@@ -1368,6 +1887,7 @@ function WorkerView({
       </section>
 
 
+
       {/* ======================================================
           WORK HISTORY
       ====================================================== */}
@@ -1394,6 +1914,8 @@ function WorkerView({
 
         </div>
 
+
+
         <div className="history-grid">
 
           <HistoryChart
@@ -1417,6 +1939,7 @@ function WorkerView({
       </section>
 
 
+
       {/* ======================================================
           MODEL EXPLANATION
       ====================================================== */}
@@ -1428,8 +1951,9 @@ function WorkerView({
       </section>
 
 
+
       {/* ======================================================
-          IMPROVEMENT CARD
+          IMPROVEMENT GUIDANCE
       ====================================================== */}
 
       <section className="improvement-card">
@@ -1441,42 +1965,124 @@ function WorkerView({
         <div className="improvement-copy">
 
           <p className="eyebrow">
-            NEXT STEP
+            IMPROVE YOUR GIGSCORE
           </p>
 
           <h2>
-            Want to improve your GigScore?
+            Build a stronger reliability profile.
           </h2>
 
           <p>
-            Your score isn't just a number.
-            Understanding the behaviours behind
-            it can help you build a stronger
-            reliability profile over time.
+            Your GigScore reflects patterns in your
+            observable work behaviour. Focus on the
+            areas below to strengthen your profile
+            over time.
           </p>
 
-        </div>
 
-        <button
-          className="improvement-button"
-          type="button"
-          onClick={() =>
-            alert(
-              "Score improvement simulator coming next."
-            )
-          }
-        >
-          Explore improvements
-          <span>
-            →
-          </span>
-        </button>
+
+          <div className="improvement-list">
+
+            <div className="improvement-item">
+
+              <span className="improvement-check">
+                ✓
+              </span>
+
+              <div>
+
+                <strong>
+                  Complete more jobs consistently
+                </strong>
+
+                <span>
+                  Maintaining a strong completion
+                  rate shows dependable work behaviour.
+                </span>
+
+              </div>
+
+            </div>
+
+
+
+            <div className="improvement-item">
+
+              <span className="improvement-check">
+                ✓
+              </span>
+
+              <div>
+
+                <strong>
+                  Reduce cancellations
+                </strong>
+
+                <span>
+                  Fewer cancellations can strengthen
+                  your reliability signal.
+                </span>
+
+              </div>
+
+            </div>
+
+
+
+            <div className="improvement-item">
+
+              <span className="improvement-check">
+                ✓
+              </span>
+
+              <div>
+
+                <strong>
+                  Maintain strong ratings
+                </strong>
+
+                <span>
+                  Consistent positive customer ratings
+                  contribute to your behavioural profile.
+                </span>
+
+              </div>
+
+            </div>
+
+
+
+            <div className="improvement-item">
+
+              <span className="improvement-check">
+                ✓
+              </span>
+
+              <div>
+
+                <strong>
+                  Keep working consistently
+                </strong>
+
+                <span>
+                  A stable work history gives the model
+                  more evidence about your reliability.
+                </span>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
 
       </section>
 
 
+
       {/* ======================================================
-          CONSENT PREVIEW
+          AUTHORIZATION
       ====================================================== */}
 
       <section className="consent-preview">
@@ -1485,7 +2091,7 @@ function WorkerView({
           🔐
         </div>
 
-        <div>
+        <div className="consent-preview-copy">
 
           <p className="eyebrow">
             YOUR DATA, YOUR CONTROL
@@ -1496,39 +2102,92 @@ function WorkerView({
           </h2>
 
           <p>
-            Before a lender can access your
-            GigScore profile, you will be asked
-            to explicitly authorize access.
+            Authorize a lender to access your GigScore
+            profile and behavioural reliability information.
+            You control whether your profile is shared.
           </p>
 
         </div>
 
-        <div className="consent-status">
 
-          <span>
-            No lender access
-          </span>
 
-          <small>
-            Consent system coming next
-          </small>
+        <div className="consent-action">
+
+          <div
+            className={
+              lenderAuthorized
+                ? "consent-status authorized"
+                : "consent-status"
+            }
+          >
+
+            <span>
+
+              {lenderAuthorized
+                ? "✓ Profile updated to lender"
+                : "No lender access"}
+
+            </span>
+
+            <small>
+
+              {lenderAuthorized
+                ? "Lender can now access your profile"
+                : "Your profile is currently private"}
+
+            </small>
+
+          </div>
+
+
+
+          {!lenderAuthorized && (
+
+            <button
+              className="authorize-button"
+              type="button"
+              onClick={() =>
+                setLenderAuthorized(true)
+              }
+            >
+
+              Authorize profile
+
+              <span>
+                →
+              </span>
+
+            </button>
+
+          )}
 
         </div>
 
       </section>
 
 
+
       {/* ======================================================
-          BACK BUTTON
+          SEARCH ANOTHER WORKER
       ====================================================== */}
 
       <button
         className="worker-reset-button"
-        onClick={clearWorker}
+        onClick={() => {
+          setLenderAuthorized(false);
+          setWorkerQuery("");
+          setWorkerSearchResults([]);
+          clearWorker();
+        }}
       >
         ← Search another worker
       </button>
 
+
+
+      {/* ======================================================
+          DISCLAIMER
+      ====================================================== */}
 
       <section className="disclaimer">
 
@@ -1547,8 +2206,10 @@ function WorkerView({
       </section>
 
     </main>
+
   );
 }
+
 
 
 // ============================================================
@@ -1558,6 +2219,7 @@ function WorkerView({
 function ScoreCard({ result }) {
 
   return (
+
     <div className="score-card">
 
       <div className="profile-label">
@@ -1585,8 +2247,10 @@ function ScoreCard({ result }) {
       </p>
 
     </div>
+
   );
 }
+
 
 
 // ============================================================
@@ -1596,6 +2260,7 @@ function ScoreCard({ result }) {
 function MetricsGrid({ worker }) {
 
   return (
+
     <div className="metrics-grid">
 
       <Metric
@@ -1608,42 +2273,58 @@ function MetricsGrid({ worker }) {
 
       <Metric
         label="Completion rate"
-        value={`${Math.round(
-          worker.completion_rate * 100
-        )}%`}
+        value={
+          `${Math.round(
+            worker.completion_rate * 100
+          )}%`
+        }
       />
 
       <Metric
         label="Cancellation rate"
-        value={`${Math.round(
-          worker.cancellation_rate * 100
-        )}%`}
+        value={
+          `${Math.round(
+            worker.cancellation_rate * 100
+          )}%`
+        }
       />
 
       <Metric
         label="Lifetime jobs"
-        value={Number(
-          worker.jobs_completed
-        ).toLocaleString()}
+        value={
+          Number(
+            worker.jobs_completed
+          ).toLocaleString()
+        }
       />
 
       <Metric
         label="Average income"
-        value={formatCurrency(
-          average(worker.monthly_income)
-        )}
+        value={
+          formatCurrency(
+            average(
+              worker.monthly_income
+            )
+          )
+        }
       />
 
       <Metric
         label="Average monthly jobs"
-        value={Math.round(
-          average(worker.monthly_jobs)
-        )}
+        value={
+          Math.round(
+            average(
+              worker.monthly_jobs
+            )
+          )
+        }
       />
 
     </div>
+
   );
 }
+
 
 
 // ============================================================
@@ -1657,6 +2338,7 @@ function Metric({
 }) {
 
   return (
+
     <div className="metric-card">
 
       <div className="metric-label">
@@ -1668,16 +2350,20 @@ function Metric({
         {value}
 
         {suffix && (
+
           <span className="metric-suffix">
             {suffix}
           </span>
+
         )}
 
       </div>
 
     </div>
+
   );
 }
+
 
 
 // ============================================================
@@ -1690,12 +2376,21 @@ function HistoryChart({
   formatter,
 }) {
 
-  const max = Math.max(
-    ...(values || [1]),
-    1
-  );
+  const safeValues =
+    Array.isArray(values)
+      ? values
+      : [];
+
+  const max =
+    Math.max(
+      ...(safeValues.length
+        ? safeValues
+        : [1]),
+      1
+    );
 
   return (
+
     <div className="history-card">
 
       <div className="history-card-header">
@@ -1707,13 +2402,15 @@ function HistoryChart({
           </p>
 
           <strong>
+
             {formatter(
-              average(values)
+              average(safeValues)
             )}
 
             <span>
               {" "}average
             </span>
+
           </strong>
 
         </div>
@@ -1721,17 +2418,20 @@ function HistoryChart({
       </div>
 
 
+
       <div className="history-bars">
 
-        {(values || []).map(
+        {safeValues.map(
           (value, index) => {
 
-            const height = Math.max(
-              5,
-              (value / max) * 100
-            );
+            const height =
+              Math.max(
+                5,
+                (Number(value) / max) * 100
+              );
 
             return (
+
               <div
                 className="history-bar-column"
                 key={index}
@@ -1750,19 +2450,25 @@ function HistoryChart({
                 </span>
 
               </div>
+
             );
+
           }
         )}
 
       </div>
+
+
 
       <div className="history-label">
         Month 1 → Month 12
       </div>
 
     </div>
+
   );
 }
+
 
 
 // ============================================================
@@ -1772,6 +2478,7 @@ function HistoryChart({
 function Explanation({ result }) {
 
   return (
+
     <section className="explanation-card">
 
       <div className="section-heading">
@@ -1795,24 +2502,31 @@ function Explanation({ result }) {
       </div>
 
 
+
       <div className="factor-columns">
 
         <FactorColumn
           title="Positive contributors"
           positive
-          factors={result.positive_factors}
+          factors={
+            result.positive_factors
+          }
         />
 
         <FactorColumn
           title="Areas requiring attention"
-          factors={result.risk_factors}
+          factors={
+            result.risk_factors
+          }
         />
 
       </div>
 
     </section>
+
   );
 }
+
 
 
 // ============================================================
@@ -1826,6 +2540,7 @@ function FactorColumn({
 }) {
 
   return (
+
     <div className="factor-column">
 
       <div
@@ -1845,6 +2560,7 @@ function FactorColumn({
       </div>
 
 
+
       {factors &&
       factors.length > 0 ? (
 
@@ -1855,7 +2571,9 @@ function FactorColumn({
 
               <div
                 className="factor"
-                key={`${factor.feature}-${index}`}
+                key={
+                  `${factor.feature}-${index}`
+                }
               >
 
                 <div className="factor-main">
@@ -1871,10 +2589,13 @@ function FactorColumn({
                         : "factor-impact negative"
                     }
                   >
+
                     {factor.impact > 0
                       ? "+"
                       : ""}
+
                     {factor.impact}
+
                   </span>
 
                 </div>
@@ -1895,8 +2616,10 @@ function FactorColumn({
       )}
 
     </div>
+
   );
 }
+
 
 
 // ============================================================
@@ -1919,7 +2642,9 @@ function average(values) {
       0
     ) / values.length
   );
+
 }
+
 
 
 function formatCurrency(value) {
@@ -1929,6 +2654,7 @@ function formatCurrency(value) {
   ).toLocaleString("en-IN")}`;
 
 }
+
 
 
 export default App;
