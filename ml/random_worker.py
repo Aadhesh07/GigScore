@@ -10,7 +10,7 @@ import pandas as pd
 from predict import predict_worker
 
 
-DATA_PATH = "data/workers.csv"
+DATA_PATH = "data/workers_backup.csv"
 
 
 def random_worker_from_dataset():

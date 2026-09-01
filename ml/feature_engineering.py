@@ -4,7 +4,7 @@ GigScore - Feature Engineering
 Converts raw synthetic worker data into model-ready behavioural features.
 
 Input:
-    data/workers.csv
+    data/workers_backup.csv
 
 Output:
     data/features.csv
@@ -20,7 +20,7 @@ import pandas as pd
 # Configuration
 # ============================================================
 
-INPUT_PATH = Path("data/workers.csv")
+INPUT_PATH = Path("data/workers_backup.csv")
 OUTPUT_PATH = Path("data/features.csv")
 
 INCOME_COLUMNS = [
