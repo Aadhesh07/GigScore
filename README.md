@@ -33,7 +33,8 @@ This gives lenders more context while keeping the final credit decision with the
 
 ---
 
-Our Deployable Link - https://gig-score-o9bffuvsg-cult8.vercel.app/
+Our Deployable Link - https://upbeat-lfrnmo2r.peachweb.site/
+Direct Link To Model - https://gig-score-o9bffuvsg-cult8.vercel.app/
 
 Our PPT For Further Information - https://github.com/Aadhesh07/GigScore/blob/main/GigScorePPT.pdf
 
